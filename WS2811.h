@@ -134,8 +134,6 @@ asm volatile( \
 "    nop\n" \
 "    out __SREG__, r26    ; reenable interrupts\n" \
 "16:\n" \
-"    sbi %[port], %[pin]  ; pin hi -> lo\n" \
-"    cbi %[port], %[pin]  ; pin hi -> lo\n" \
 : \
 : [rgb] "z" (RGB), \
   [len] "w" (LEN), \
