@@ -9,22 +9,27 @@
 #include <util/delay.h>
 #include <WS2811.h>
 
+// Adjust as necessary.
+#define PORT  PORTB
+#define DDR    DDRB
+#define PIN       0
+#define PAUSE  1000     // msec
+#define DELAY    10	// msec
+
+// Bit twiddling macros.
 #define BIT(B)           (0x01 << (uint8_t)(B))
 #define SET_BIT_HI(V, B) (V) |= (uint8_t)BIT(B)
 #define SET_BIT_LO(V, B) (V) &= (uint8_t)~BIT(B)
-
-#define PAUSE  1000     // msec
-#define DELAY    10	// msec
  
-// Define the output function, using pin 0 on port b.
-DEFINE_WS2811_FN(WS2811RGB, PORTB, 0)
+// Define the output function.
+DEFINE_WS2811_FN(WS2811RGB, PORT, PIN)
 
 // Drive the three pixels in an infinit loop.
 void threepixeldemo(void)
 {
     // Configure pin for output.
-    SET_BIT_HI(DDRB, 0);
-    SET_BIT_LO(PORTB, 0);
+    SET_BIT_HI(DDR, PIN);
+    SET_BIT_LO(PORT, PIN);
 
     // off->red, off->green, off->blue
     RGB_t rgb[3] = {{0,0,0},{0,0,0},{0,0,0}};
