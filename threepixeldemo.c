@@ -24,7 +24,7 @@
 // Define the output function.
 DEFINE_WS2811_FN(WS2811RGB, PORT, PIN)
 
-// Drive the three pixels in an infinit loop.
+// Drive the three pixels in an infinite loop.
 void threepixeldemo(void)
 {
     // Configure pin for output.
