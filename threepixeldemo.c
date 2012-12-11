@@ -3,6 +3,7 @@
  * Use is subject to license terms.
  *
  * Demo of the WS2811 driver, driving 3 pixels.
+ * Compile in GNU C99 mode (-std=gnu99)
  */
 
 #include <avr/io.h>
