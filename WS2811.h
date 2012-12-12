@@ -36,7 +36,7 @@ asm volatile( \
 "    cp %A[len], r1      ; check len > 0, return immediately if it is\n" \
 "    cpc %B[len], r1\n" \
 "    brne 1f\n" \
-"    rjmp 16f\n" \
+"    rjmp 18f\n" \
 "1:  ld r18, Z+           ; load in first red byte to be output\n" \
 "    ld r19, Z+           ; load in first green byte to be output\n" \
 "    ld r20, Z+           ; load in first blue byte to be output\n" \
@@ -50,7 +50,7 @@ asm volatile( \
 "    cbi  %[port], %[pin] ; false, pin hi -> lo\n" \
 "3:  sbrc r19, 7          ; equalise delay of both code paths\n" \
 "    rjmp 4f\n" \
-"4:  nop                  ; pulse timing delay\n" \
+"4:  nop\n" \
 "    nop\n" \
 "    nop\n" \
 "    nop\n" \
@@ -68,7 +68,7 @@ asm volatile( \
 "    cbi %[port], %[pin]  ; false, pin hi -> lo\n" \
 "6:  sbrc r18, 7          ; equalise delay of both code paths\n" \
 "    rjmp 7f\n" \
-"7:  nop                  ; pulse timing delay\n" \
+"7:  nop\n" \
 "    nop\n" \
 "    nop\n" \
 "    nop\n" \
@@ -79,30 +79,31 @@ asm volatile( \
 "    cbi %[port], %[pin]  ; pin hi -> lo\n" \
 "    brne 5b              ; inner loop, if required\n" \
 "    nop                  ; equalise delay of both code paths\n" \
-/* red, 8th bit - output & fetch next values */ \
+/* red, 8th bit - output & check for end of outer loop */ \
 "    sbi %[port], %[pin]  ; pin lo -> hi\n" \
 "    sbrc r18, 7          ; test hi bit clear\n" \
 "    rjmp 8f              ; true, skip pin hi -> lo\n" \
 "    cbi %[port], %[pin]  ; false, pin hi -> lo\n" \
 "8:  sbrc r18, 7          ; equalise delay of both code paths\n" \
 "    rjmp 9f\n" \
-"9:  nop                  ; pulse timing delay\n" \
-"    nop\n" \
-"    nop\n" \
+"9:  sbiw %A[len], 1      ; decrement outer loop counter\n" \
+"    in r0, __SREG__      ; save status register\n" \
+"    breq 10f             ; skip if zero\n" \
 "    ld r18, Z+           ; load next red byte\n" \
-"    ld r19, Z+           ; load next green byte\n" \
+"10: brne 11f             ; equalise delay of both code paths\n" \
+"    nop\n" \
+"    nop\n" \
+"11: cbi %[port], %[pin]  ; pin hi -> lo\n" \
 "    ldi r27, 7           ; reload inner loop counter\n" \
-"    cbi %[port], %[pin]  ; pin hi -> lo\n" \
-"    nop                  ; pulse timing delay\n" \
 "    nop\n" \
 /* blue - loop over first 7 bits */ \
-"10:  sbi %[port], %[pin] ; pin lo -> hi\n" \
+"12: sbi %[port], %[pin]  ; pin lo -> hi\n" \
 "    sbrc r20, 7          ; test hi bit clear\n" \
-"    rjmp 11f             ; true, skip pin hi -> lo\n" \
+"    rjmp 13f             ; true, skip pin hi -> lo\n" \
 "    cbi %[port], %[pin]  ; false, pin hi -> lo\n" \
-"11: sbrc r20, 7          ; equalise delay of both code paths\n" \
-"    rjmp 12f\n" \
-"12: nop                  ; pulse timing delay\n" \
+"13: sbrc r20, 7          ; equalise delay of both code paths\n" \
+"    rjmp 14f\n" \
+"14: nop\n" \
 "    nop\n" \
 "    nop\n" \
 "    nop\n" \
@@ -111,35 +112,37 @@ asm volatile( \
 "    lsl r20              ; shift to next bit\n" \
 "    dec r27              ; decrement inner loop counter\n" \
 "    cbi %[port], %[pin]  ; pin hi -> lo\n" \
-"    brne 10b             ; inner loop, if required\n" \
+"    brne 12b             ; inner loop, if required\n" \
 "    nop                  ; equalise delay of both code paths\n" \
 /* blue, 8th bit -  output & handle outer loop */ \
 "    sbi %[port], %[pin]  ; pin lo -> hi\n" \
 "    sbrc r20, 7          ; test hi bit clear\n" \
-"    rjmp 13f             ; true, skip pin hi -> lo\n" \
+"    rjmp 15f             ; true, skip pin hi -> lo\n" \
 "    cbi %[port], %[pin]  ; false, pin hi -> lo\n" \
-"13: sbrc r20, 7          ; equalise delay of both code paths\n" \
-"    rjmp 14f\n" \
-"14: nop                  ; pulse timing delay\n" \
-"    nop\n" \
+"15: sbrc r20, 7          ; equalise delay of both code paths\n" \
+"    rjmp 16f\n" \
+"16: nop\n" \
 "    ldi r27, 8           ; reload inner loop counter\n" \
-"    sbiw %A[len], 1      ; decrement outer loop counter\n" \
-"    breq 15f             ; exit outer loop if zero\n" \
-"    ld r20, Z+           ; load in next blue byte\n" \
+"    out __SREG__, r0     ; restore status register\n" \
+"    breq 17f             ; exit outer loop if zero\n" \
+"    ld r19, Z+           ; load next green byte\n" \
+"    ld r20, Z+           ; load next blue byte\n" \
 "    cbi %[port], %[pin]  ; pin hi -> lo\n" \
 "    rjmp 2b              ; outer loop, if required\n" \
-"15: nop                  ; pulse timing delay\n" \
+"17: nop\n" \
+"    nop\n" \
+"    nop\n" \
 "    cbi %[port], %[pin]  ; pin hi -> lo\n" \
-"    nop                  ; pulse timing delay\n" \
+"    nop\n" \
 "    nop\n" \
 "    out __SREG__, r26    ; reenable interrupts\n" \
-"16:\n" \
+"18:\n" \
 : \
 : [rgb] "z" (RGB), \
   [len] "w" (LEN), \
   [port] "I" (_SFR_IO_ADDR(PORT)), \
   [pin] "I" (PIN) \
-: "r18", "r19", "r20", "r26", "r27", "cc", "memory" \
+: "r0", "r18", "r19", "r20", "r26", "r27", "cc", "memory" \
 )
 
 /*

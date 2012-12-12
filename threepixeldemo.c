@@ -62,55 +62,44 @@ void threepixeldemo(void)
             WS2811RGB(rgb, ARRAYLEN(rgb));
             _delay_ms(DELAY);
         }
-        // green->cyan, blue->magenta, white->off
+        // green->cyan, blue->magenta, white->red
         for (int i = 0; i < 255; i++) {
             rgb[0].b += 1; 
             rgb[1].r += 1; 
-            rgb[2].r -= 1; 
             rgb[2].g -= 1; 
             rgb[2].b -= 1; 
             WS2811RGB(rgb, ARRAYLEN(rgb));
             _delay_ms(DELAY);
         }
-        // cyan->blue, magenta->white, off->red
+        // cyan->blue, magenta->white, red->yellow
         for (int i = 0; i < 255; i++) {
             rgb[0].g -= 1;
             rgb[1].g += 1;
-            rgb[2].r += 1;
-            WS2811RGB(rgb, ARRAYLEN(rgb));
-            _delay_ms(DELAY);
-        }
-        // blue->magenta, white->off, red->yellow
-        for (int i = 0; i < 255; i++) {
-            rgb[0].r += 1;
-            rgb[1].r -= 1;
-            rgb[1].g -= 1;
-            rgb[1].b -= 1;
             rgb[2].g += 1;
             WS2811RGB(rgb, ARRAYLEN(rgb));
             _delay_ms(DELAY);
         }
-        // magenta->white, off->red, yellow->green
+        // blue->magenta, white->red, yellow->green
         for (int i = 0; i < 255; i++) {
-            rgb[0].g += 1;
-            rgb[1].r += 1;
+            rgb[0].r += 1;
+            rgb[1].g -= 1;
+            rgb[1].b -= 1;
             rgb[2].r -= 1;
             WS2811RGB(rgb, ARRAYLEN(rgb));
             _delay_ms(DELAY);
         }
-        // white->off, red->yellow, green->cyan
+        // magenta->white, red->yellow, green->cyan
         for (int i = 0; i < 255; i++) {
-            rgb[0].r -= 1;
-            rgb[0].g -= 1;
-            rgb[0].b -= 1;
+            rgb[0].g += 1;
             rgb[1].g += 1;
             rgb[2].b += 1;
             WS2811RGB(rgb, ARRAYLEN(rgb));
             _delay_ms(DELAY);
         }
-        // off->red, yellow->green, cyan->blue
+        // white->red, yellow->green, cyan->blue
         for (int i = 0; i < 255; i++) {
-            rgb[0].r += 1;
+            rgb[0].b -= 1;
+            rgb[0].g -= 1;
             rgb[1].r -= 1;
             rgb[2].g -= 1;
             WS2811RGB(rgb, ARRAYLEN(rgb));
