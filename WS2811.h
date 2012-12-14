@@ -24,11 +24,12 @@ typedef struct __attribute__ ((__packed__)) {
 /*
  * Inline asm macro to output 24-bit RGB value in (G,R,B) order, MSBit first.
  * 0 bits are 250ns hi, 1000ns lo, 1 bits are 1000ns hi, 250ns lo.
- * r18 = red byte to be output
- * r19 = green byte to be output
- * r20 = blue byte to be output
- * r26 = saved SREG
- * r27 = inner loop counter
+ * r0  - saved SREG from outer loop counter decrement
+ * r18 - red byte to be output
+ * r19 - green byte to be output
+ * r20 - blue byte to be output
+ * r26 - saved SREG from before interrupt disable
+ * r27 - inner loop counter
  */
 #define WS2811(PORT, PIN, RGB, LEN) \
 asm volatile( \
