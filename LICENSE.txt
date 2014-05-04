@@ -1,4 +1,4 @@
-Copyright 2012 Alan Burlison, alan@bleaklow.com.  All rights reserved.
+Copyright 2014 Alan Burlison, alan@bleaklow.com.  All rights reserved.
 Use is subject to license terms.
 
 Redistribution and use in source and binary forms, with or without
