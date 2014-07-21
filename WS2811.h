@@ -182,6 +182,237 @@ asm volatile( \
 )
 
 /*
+ * Inline asm macro to output three streams of 24-bit GRB values in
+ * (G,R,B) order, MSBit first.  The three output pins must be on the same
+ * atmega port.
+ * 0 bits are 250ns hi, 1000ns lo, 1 bits are 1000ns hi, 250ns lo.
+ * r18 = stream 0 byte to be output
+ * r19 = stream 1 byte to be output
+ * r20 = stream 2 byte to be output
+ * r21 = original port value with all three pins low
+ * r22 = original port value with all three pins high
+ * r23 = original port value with the 3 pins set to their next output values
+ * r24 = (+r25) outer loop counter
+ * r16 = saved SREG
+ * r17 = inner loop counter
+ *
+ * NOTE: a similar 4-pin version would also be possible but we'd need to
+ * unroll the last two iterations to save enough cycles instead of only the
+ * single last iteration.
+ * Instead if you need 4 or more parallel outputs you're probably better off
+ * with the approach where the output bits are pre-grouped into atmega port
+ * values.
+ */
+#define WS2811_OUT_3_COMMON(PORT, PIN0, RGB0, PIN1, RGB1, PIN2, RGB2, LEN) \
+asm volatile( \
+/* initialise */ \
+"    movw r24, %[len]      ; multiply len by 3\n" \
+"    add r24, %A[len]\n" \
+"    adc r25, %B[len]\n" \
+"    add r24, %A[len]\n" \
+"    adc r25, %B[len]\n" \
+"    in r21, %[port]\n" \
+"    mov r22, r21\n" \
+"    sbr r22, (1 << %[pin0]) | (1 << %[pin1]) | (1 << %[pin2])\n" \
+"    mov r23, r21\n" \
+"    ldi r17, 7             ; load inner loop counter\n" \
+"    in r16, __SREG__       ; timing-critical, so no interrupts\n" \
+"    cli\n" \
+"    rjmp 2f                ; start with the end-of-loop check\n" \
+/* loop over the first 7 bits */ \
+"1:  out %[port], r22       ; pins lo -> hi\n" \
+"    nop\n" \
+"    nop\n" \
+"    nop\n" \
+"    out %[port], r23       ; pins hi -> colour output bit\n" \
+"    nop\n" \
+"    nop\n" \
+"    lsl r18                ; shift stream 0 byte to next bit, set Carry\n" \
+"    bst r18, 7\n" \
+"    bld r23, %[pin0]       ; load r18 bit 7 into pin0\n" \
+"    lsl r19                ; shift stream 0 byte to next bit, set Carry\n" \
+"    bst r19, 7\n" \
+"    bld r23, %[pin1]       ; load r19 bit 7 into pin1\n" \
+"    lsl r20                ; shift stream 1 byte to next bit, set Carry\n" \
+"    bst r20, 7\n" \
+"    bld r23, %[pin2]       ; load r20 bit 7 into pin2\n" \
+"    out %[port], r21       ; pins hi -> lo if not already low\n" \
+"    dec r17                ; decrement loop counter, set flags\n" \
+"    brne 1b                ; (inner) loop if required\n" \
+"    ldi r17, 7             ; reload inner loop counter\n" \
+/* 8th bit - output & fetch next values */ \
+"    out %[port], r22       ; pins lo -> hi\n" \
+"2:  ld r18, %a[rgb0]+      ; load next stream 0 byte\n" \
+"    bst r18, 7\n" \
+"    out %[port], r23       ; pins hi -> colour output bit\n" \
+"    bld r23, %[pin0]       ; load r18 bit 7 into pin0\n" \
+"    ld r19, %a[rgb1]+      ; load next stream 1 byte\n" \
+"    bst r19, 7\n" \
+"    bld r23, %[pin1]       ; load r19 bit 7 into pin1\n" \
+"    ld r20, %a[rgb2]+      ; load next stream 2 byte\n" \
+"    bst r20, 7\n" \
+"    bld r23, %[pin2]       ; load r20 bit 7 into pin2\n" \
+"    sbiw r24, 1            ; decrement outer loop counter\n" \
+"    out %[port], r21       ; pins hi -> lo if not already low\n" \
+"    nop\n" \
+"    brge 1b                ; (outer) loop if required\n" \
+"    out __SREG__, r16      ; reenable interrupts if required\n" \
+: \
+: [rgb0] "e" (RGB0), \
+  [rgb1] "e" (RGB1), \
+  [rgb2] "e" (RGB2), \
+  [len] "r" (LEN), /* For some reason we can't use "w" here to get r24 */ \
+  [port] "I" (_SFR_IO_ADDR(PORT)), \
+  [pin0] "I" (PIN0), \
+  [pin1] "I" (PIN1), \
+  [pin2] "I" (PIN2) \
+: "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", \
+  "cc", "memory" \
+)
+
+/*
+ * Inline asm macro to output four streams of 24-bit GRB values in
+ * (G,R,B) order, MSBit first.  The four output pins must be on the same
+ * atmega port.
+ * 0 bits are 250ns hi, 1000ns lo, 1 bits are 1000ns hi, 250ns lo.
+ * r17 = stream 0 byte to be output
+ * r18 = stream 1 byte to be output
+ * r19 = stream 2 byte to be output
+ * r20 = stream 3 byte to be output
+ * r21 = original port value with all three pins low
+ * r22 = original port value with all three pins high
+ * r23 = original port value with the 4 pins set to their next output values
+ * r24 = (+r25) outer loop counter
+ * r15 = saved SREG
+ * r16 = inner loop counter
+ */
+#define WS2811_OUT_4_COMMON(PORT, PIN0, RGB0, PIN1, RGB1, PIN2, RGB2, PIN3, RGB3, LEN) \
+asm volatile( \
+/* initialise */ \
+"    movw r24, %[len]      ; multiply len by 3\n" \
+"    add r24, %A[len]\n" \
+"    adc r25, %B[len]\n" \
+"    add r24, %A[len]\n" \
+"    adc r25, %B[len]\n" \
+"    in r21, %[port]\n" \
+"    mov r22, r21\n" \
+"    sbr r22, (1 << %[pin0]) | (1 << %[pin1]) | (1 << %[pin2]) | (1 << %[pin3])\n" \
+"    mov r23, r21\n" \
+"    movw r26, %[rgb0]\n" \
+"    ld r17, X+             ; load next stream 0 byte\n" \
+"    movw %[rgb0], r26\n" \
+"    movw r26, %[rgb1]\n" \
+"    ld r18, X+             ; load next stream 1 byte\n" \
+"    movw %[rgb1], r26\n" \
+"    ld r19, %a[rgb2]+      ; load next stream 2 byte\n" \
+"    ld r20, %a[rgb3]+      ; load next stream 3 byte\n" \
+"    ldi r16, 6             ; load inner loop counter\n" \
+"    in r15, __SREG__       ; timing-critical, so no interrupts\n" \
+"    cli\n" \
+"    rjmp 2f                ; start with the end-of-loop check\n" \
+/* loop over the first 6 bits */ \
+"1:  out %[port], r22       ; pins lo -> hi\n" \
+"    nop\n" \
+"    nop\n" \
+"    lsl r17                ; shift stream 0 byte to next bit, set Carry\n" \
+"    out %[port], r23       ; pins hi -> colour output bit\n" \
+"    bst r17, 7\n" \
+"    bld r23, %[pin0]       ; load r17 bit 7 into pin0\n" \
+"    lsl r18                ; shift stream 1 byte to next bit, set Carry\n" \
+"    bst r18, 7\n" \
+"    bld r23, %[pin1]       ; load r18 bit 7 into pin1\n" \
+"    lsl r19                ; shift stream 2 byte to next bit, set Carry\n" \
+"    bst r19, 7\n" \
+"    bld r23, %[pin2]       ; load r19 bit 7 into pin2\n" \
+"    lsl r20                ; shift stream 3 byte to next bit, set Carry\n" \
+"    bst r20, 7\n" \
+"    bld r23, %[pin3]       ; load r20 bit 7 into pin3\n" \
+"    out %[port], r21       ; pins hi -> lo if not already low\n" \
+"    dec r16                ; decrement loop counter, set flags\n" \
+"    brne 1b                ; (inner) loop if required\n" \
+"    ldi r16, 6             ; reload inner loop counter\n" \
+/* 7th bit - output & fetch next values */ \
+"    out %[port], r22       ; pins lo -> hi\n" \
+"    nop\n" \
+"    nop\n" \
+"    bst r17, 6\n" \
+"    out %[port], r23       ; pins hi -> colour output bit\n" \
+"    bld r23, %[pin0]       ; load r17 bit 6 into pin0\n" \
+"    bst r18, 6\n" \
+"    bld r23, %[pin1]       ; load r18 bit 6 into pin1\n" \
+"    bst r19, 6\n" \
+"    bld r23, %[pin2]       ; load r19 bit 6 into pin2\n" \
+"    bst r20, 6\n" \
+"    bld r23, %[pin3]       ; load r20 bit 6 into pin3\n" \
+"    movw r26, %[rgb0]\n" \
+"    ld r17, X+             ; load next stream 0 byte\n" \
+"    movw %[rgb0], r26\n" \
+"    out %[port], r21       ; pins hi -> lo if not already low\n" \
+"    movw r26, %[rgb1]\n" \
+"    ld r18, X+             ; load next stream 1 byte\n" \
+/* 8th bit - output & fetch next values */ \
+"    out %[port], r22       ; pins lo -> hi\n" \
+"    movw %[rgb1], r26\n" \
+"    ld r19, %a[rgb2]+      ; load next stream 2 byte\n" \
+"    out %[port], r23       ; pins hi -> colour output bit\n" \
+"    ld r20, %a[rgb3]+      ; load next stream 3 byte\n" \
+"2:  bst r17, 7\n" \
+"    bld r23, %[pin0]       ; load r17 bit 7 into pin0\n" \
+"    bst r18, 7\n" \
+"    bld r23, %[pin1]       ; load r18 bit 7 into pin1\n" \
+"    bst r19, 7\n" \
+"    bld r23, %[pin2]       ; load r19 bit 7 into pin2\n" \
+"    bst r20, 7\n" \
+"    sbiw r24, 1            ; decrement outer loop counter\n" \
+"    out %[port], r21       ; pins hi -> lo if not already low\n" \
+"    bld r23, %[pin3]       ; load r20 bit 7 into pin3\n" \
+"    brge 1b                ; (outer) loop if required\n" \
+"    out __SREG__, r15      ; reenable interrupts if required\n" \
+: \
+: [rgb0] "r" (RGB0), \
+  [rgb1] "r" (RGB1), \
+  [rgb2] "e" (RGB2), \
+  [rgb3] "e" (RGB3), \
+  [len] "r" (LEN), \
+  [port] "I" (_SFR_IO_ADDR(PORT)), \
+  [pin0] "I" (PIN0), \
+  [pin1] "I" (PIN1), \
+  [pin2] "I" (PIN2), \
+  [pin3] "I" (PIN3) \
+: "r15", "r16", "r18", "r19", "r20", "r21", "r22", "r23", \
+  "r24", "r25", "r26", "r27", \
+  "cc", "memory" \
+)
+
+/*
+ * 7 parallel outputs should also be possible with the loop looking something
+ * like the following, but may require all iterations to be unrolled or some
+ * other trick to save enough cycles to load the bytes to be output into r16,
+ * r17, r18, r19, r20, r21, r22.  This gets quite tricky.
+"    ori r25, 0xff\n" \
+"1:  out %[port], r25       ; pins lo -> hi\n" \
+"    lsl r16                ; shift stream 0 byte to next bit, set Carry\n" \
+"    rol r24                ; load Carry into pin0\n" \
+"    lsl r22                ; shift stream 6 byte to next bit, set Carry\n" \
+"    out %[port], r24       ; pins hi -> colour output bit\n" \
+"    rol r24                ; load Carry into pin6\n" \
+"    lsl r21                ; shift stream 5 byte to next bit, set Carry\n" \
+"    rol r24                ; load Carry into pin5\n" \
+"    lsl r20                ; shift stream 4 byte to next bit, set Carry\n" \
+"    rol r24                ; load Carry into pin4\n" \
+"    lsl r19                ; shift stream 3 byte to next bit, set Carry\n" \
+"    rol r24                ; load Carry into pin3\n" \
+"    lsl r18                ; shift stream 2 byte to next bit, set Carry\n" \
+"    rol r24                ; load Carry into pin2\n" \
+"    lsl r17                ; shift stream 1 byte to next bit, set Carry\n" \
+"    rol r24                ; load Carry into pin1\n" \
+"    out %[port], __zero_reg__ ; pins hi -> lo if not already low\n" \
+"    dec r15                ; decrement loop counter, set flags\n" \
+"    brne 1b                ; (inner) loop if required\n" \
+"    ldi r15, 7             ; reload inner loop counter\n" \
+ */
+
+/*
  * Define C functions to wrap the inline WS2811 macro for given ports and pins.
  */
 #define DEFINE_WS2811_OUT_1_FN(NAME, PORT, PIN) \
@@ -193,6 +424,23 @@ extern void NAME(const RGB_t *rgb0, const RGB_t *rgb1, uint16_t len) \
     __attribute__((noinline)); \
 void NAME(const RGB_t *rgb0, const RGB_t *rgb1, uint16_t len) { \
     WS2811_OUT_2(PORT0, PIN0, rgb0, PORT1, PIN1, rgb1, len); \
+}
+
+#define DEFINE_WS2811_OUT_3_COMMON_FN(NAME, PORT, PIN0, PIN1, PIN2) \
+extern void NAME(const RGB_t *rgb0, const RGB_t *rgb1, const RGB_t *rgb2, \
+        uint16_t len) __attribute__((noinline)); \
+void NAME(const RGB_t *rgb0, const RGB_t *rgb1, const RGB_t *rgb2, \
+        uint16_t len) { \
+    WS2811_OUT_3_COMMON(PORT, PIN0, rgb0, PIN1, rgb1, PIN2, rgb2, len); \
+}
+
+#define DEFINE_WS2811_OUT_4_COMMON_FN(NAME, PORT, PIN0, PIN1, PIN2, PIN3) \
+extern void NAME(const RGB_t *rgb0, const RGB_t *rgb1, const RGB_t *rgb2, \
+        const RGB_t *rgb3, uint16_t len) __attribute__((noinline)); \
+void NAME(const RGB_t *rgb0, const RGB_t *rgb1, const RGB_t *rgb2, \
+        const RGB_t *rgb3, uint16_t len) { \
+    WS2811_OUT_4_COMMON(PORT, PIN0, rgb0, PIN1, rgb1, PIN2, rgb2, PIN3, rgb3, \
+            len); \
 }
 
 #endif /* WS2811_h */
