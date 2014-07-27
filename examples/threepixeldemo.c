@@ -23,7 +23,7 @@
 #define SET_BIT_LO(V, B) (V) &= (uint8_t)~BIT(B)
  
 // Define the output function.
-DEFINE_WS2811_FN(WS2811RGB, PORT, PIN)
+DEFINE_WS2811_OUT_1_FN(WS2811RGB, PORT, PIN)
 
 // Drive the three pixels in an infinite loop.
 void threepixeldemo(void)
